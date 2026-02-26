@@ -2,20 +2,11 @@
 
 import { motion } from "framer-motion";
 import { useState } from "react";
-import { SectionHeader } from "@/components/ui";
-
-interface CacheBlock {
-  id: number;
-  owner: string | null; // sequence id
-  layer: number;
-  type: "key" | "value";
-  refCount: number;
-  tokens: number;
-}
+import { SectionHeader, StatGrid, InfoCard } from "@/components/ui";
 
 export default function KVCachePage() {
   const [selectedSeq, setSelectedSeq] = useState<string | null>(null);
-  const [showSharing, setShowSharing] = useState(false);
+  const [sharing, setSharing] = useState(false);
 
   const sequences = [
     { id: "seq_A", prompt: "Tell me about", generated: ["machine", "learning", "and"], color: "#7c3aed" },
@@ -24,238 +15,207 @@ export default function KVCachePage() {
   ];
 
   // Build cache blocks
-  const cacheBlocks: CacheBlock[] = [];
-  let blockId = 0;
+  type CBlock = { id: number; owner: string; type: "K" | "V"; refCount: number; tokens: number };
+  const blocks: CBlock[] = [];
+  let bid = 0;
 
-  // If sharing is enabled, seq_A and seq_B share prompt blocks
-  const sharedPromptBlockK = blockId++;
-  const sharedPromptBlockV = blockId++;
-
-  if (showSharing) {
-    cacheBlocks.push(
-      { id: sharedPromptBlockK, owner: "shared_AB", layer: 0, type: "key", refCount: 2, tokens: 3 },
-      { id: sharedPromptBlockV, owner: "shared_AB", layer: 0, type: "value", refCount: 2, tokens: 3 },
+  if (sharing) {
+    // A & B share prompt blocks
+    blocks.push(
+      { id: bid++, owner: "shared_AB", type: "K", refCount: 2, tokens: 3 },
+      { id: bid++, owner: "shared_AB", type: "V", refCount: 2, tokens: 3 },
     );
   } else {
-    // Separate blocks for A and B
-    cacheBlocks.push(
-      { id: sharedPromptBlockK, owner: "seq_A", layer: 0, type: "key", refCount: 1, tokens: 3 },
-      { id: sharedPromptBlockV, owner: "seq_A", layer: 0, type: "value", refCount: 1, tokens: 3 },
-      { id: blockId++, owner: "seq_B", layer: 0, type: "key", refCount: 1, tokens: 3 },
-      { id: blockId++, owner: "seq_B", layer: 0, type: "value", refCount: 1, tokens: 3 },
+    blocks.push(
+      { id: bid++, owner: "seq_A", type: "K", refCount: 1, tokens: 3 },
+      { id: bid++, owner: "seq_A", type: "V", refCount: 1, tokens: 3 },
+      { id: bid++, owner: "seq_B", type: "K", refCount: 1, tokens: 3 },
+      { id: bid++, owner: "seq_B", type: "V", refCount: 1, tokens: 3 },
     );
   }
 
-  // Generated token blocks
+  // Generated blocks
   sequences.forEach((seq) => {
     if (seq.generated.length > 0) {
-      cacheBlocks.push(
-        { id: blockId++, owner: seq.id, layer: 0, type: "key", refCount: 1, tokens: seq.generated.length },
-        { id: blockId++, owner: seq.id, layer: 0, type: "value", refCount: 1, tokens: seq.generated.length },
+      blocks.push(
+        { id: bid++, owner: seq.id, type: "K", refCount: 1, tokens: seq.generated.length },
+        { id: bid++, owner: seq.id, type: "V", refCount: 1, tokens: seq.generated.length },
       );
     }
   });
 
   // seq_C prompt
-  cacheBlocks.push(
-    { id: blockId++, owner: "seq_C", layer: 0, type: "key", refCount: 1, tokens: 3 },
-    { id: blockId++, owner: "seq_C", layer: 0, type: "value", refCount: 1, tokens: 3 },
+  blocks.push(
+    { id: bid++, owner: "seq_C", type: "K", refCount: 1, tokens: 3 },
+    { id: bid++, owner: "seq_C", type: "V", refCount: 1, tokens: 3 },
   );
 
-  const getOwnerColor = (owner: string | null) => {
-    if (owner === "shared_AB") return "#f59e0b";
-    const seq = sequences.find((s) => s.id === owner);
-    return seq?.color || "#6b7280";
+  const ownerColor = (o: string) => {
+    if (o === "shared_AB") return "#f59e0b";
+    return sequences.find((s) => s.id === o)?.color || "#6b7280";
   };
 
-  const totalBlocks = 16;
-  const usedBlocks = cacheBlocks.length;
-  const savedBlocks = showSharing ? 2 : 0;
+  const totalSlots = 16;
+  const used = blocks.length;
+  const saved = sharing ? 2 : 0;
 
   return (
-    <div className="max-w-6xl mx-auto">
+    <div>
       <SectionHeader
+        badge="Memory"
         title="KV Cache Management"
-        subtitle="Every attention layer stores Key and Value tensors for all previous tokens. vLLM manages this cache with block-level granularity, enabling sharing and efficient memory use."
-        badge="MEMORY"
+        subtitle="Each attention layer caches Key and Value tensors for past tokens. vLLM maps them to physical blocks through a block table, just like a page table in an OS."
       />
 
-      {/* Controls */}
+      {/* Toggle */}
       <div className="flex items-center gap-4 mb-8">
         <button
-          onClick={() => setShowSharing(!showSharing)}
-          className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-            showSharing
-              ? "bg-amber-500/20 text-amber-400 border border-amber-500/40"
-              : "bg-[var(--card-bg)] border border-[var(--card-border)] text-[var(--muted)] hover:text-white"
-          }`}
+          onClick={() => setSharing(!sharing)}
+          className={sharing ? "btn-primary" : "btn-secondary"}
         >
-          {showSharing ? "✓ Prefix Sharing ON" : "Enable Prefix Sharing"}
+          {sharing ? "Prefix Sharing ON" : "Enable Prefix Sharing"}
         </button>
-        <div className="text-sm text-[var(--muted)]">
-          {showSharing && (
-            <span className="text-amber-400">
-              Seq A & B share prompt KV cache (same prefix &quot;Tell me about&quot;)
-            </span>
-          )}
-        </div>
+        {sharing && (
+          <span className="text-xs" style={{ color: "#f59e0b" }}>
+            Seq A &amp; B share the KV cache for their common prefix &quot;Tell me about&quot;
+          </span>
+        )}
       </div>
 
-      {/* Sequences */}
-      <div className="grid grid-cols-3 gap-4 mb-8">
-        {sequences.map((seq) => (
-          <motion.div
-            key={seq.id}
-            onClick={() => setSelectedSeq(selectedSeq === seq.id ? null : seq.id)}
-            whileHover={{ y: -2 }}
-            className={`bg-[var(--card-bg)] border rounded-xl p-4 cursor-pointer transition-colors ${
-              selectedSeq === seq.id
-                ? "border-opacity-60"
-                : "border-[var(--card-border)]"
-            }`}
-            style={{
-              borderColor: selectedSeq === seq.id ? seq.color : undefined,
-            }}
-          >
-            <div className="flex items-center gap-2 mb-3">
-              <div
-                className="w-3 h-3 rounded-full"
-                style={{ backgroundColor: seq.color }}
-              />
-              <span className="text-sm font-mono font-medium">{seq.id}</span>
-            </div>
-            <div className="flex flex-wrap gap-1">
-              {seq.prompt.split(" ").map((t, i) => (
-                <span
-                  key={`p${i}`}
-                  className="px-2 py-0.5 rounded text-xs font-mono bg-gray-500/10 text-gray-400"
-                >
-                  {t}
+      {/* Sequence cards */}
+      <div className="grid grid-cols-3 gap-3 mb-8">
+        {sequences.map((seq) => {
+          const active = selectedSeq === seq.id;
+          return (
+            <motion.button
+              key={seq.id}
+              onClick={() => setSelectedSeq(active ? null : seq.id)}
+              whileHover={{ y: -2 }}
+              className="card p-4 text-left transition-colors"
+              style={active ? { borderColor: seq.color } : {}}
+            >
+              <div className="flex items-center gap-2 mb-2.5">
+                <div className="w-2.5 h-2.5 rounded-full" style={{ background: seq.color }} />
+                <span className="text-xs font-mono font-semibold" style={{ color: "var(--text)" }}>
+                  {seq.id}
                 </span>
-              ))}
-              {seq.generated.map((t, i) => (
-                <span
-                  key={`g${i}`}
-                  className="px-2 py-0.5 rounded text-xs font-mono"
-                  style={{
-                    backgroundColor: seq.color + "20",
-                    color: seq.color,
-                  }}
-                >
-                  {t}
-                </span>
-              ))}
-            </div>
-          </motion.div>
-        ))}
+              </div>
+              <div className="flex flex-wrap gap-1">
+                {seq.prompt.split(" ").map((t, i) => (
+                  <span
+                    key={`p${i}`}
+                    className="px-1.5 py-0.5 rounded text-[10px] font-mono"
+                    style={{ background: "var(--bg-secondary)", color: "var(--text-muted)" }}
+                  >
+                    {t}
+                  </span>
+                ))}
+                {seq.generated.map((t, i) => (
+                  <span
+                    key={`g${i}`}
+                    className="px-1.5 py-0.5 rounded text-[10px] font-mono"
+                    style={{ background: seq.color + "15", color: seq.color }}
+                  >
+                    {t}
+                  </span>
+                ))}
+              </div>
+            </motion.button>
+          );
+        })}
       </div>
 
-      <div className="grid grid-cols-2 gap-8">
-        {/* Block Table */}
-        <div className="bg-[var(--card-bg)] border border-[var(--card-border)] rounded-xl p-6">
-          <h3 className="text-sm font-semibold text-violet-400 mb-4">Block Table Mapping</h3>
-          <div className="space-y-2">
-            {cacheBlocks
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+        {/* Block table */}
+        <div className="card p-5">
+          <h3 className="section-label mb-4" style={{ color: "var(--accent-text)" }}>
+            Block Table
+          </h3>
+          <div className="space-y-1.5">
+            {blocks
               .filter((b) => !selectedSeq || b.owner === selectedSeq || b.owner === "shared_AB")
-              .map((block) => (
+              .map((b) => (
                 <motion.div
-                  key={block.id}
+                  key={b.id}
                   layout
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
-                  className="flex items-center gap-3 rounded-lg p-2 hover:bg-white/5"
+                  className="flex items-center gap-3 rounded-lg p-2 transition-colors"
+                  style={{ background: ownerColor(b.owner) + "06" }}
                 >
-                  <div
-                    className="w-8 h-8 rounded flex items-center justify-center text-xs font-mono font-bold"
-                    style={{
-                      backgroundColor: getOwnerColor(block.owner) + "20",
-                      color: getOwnerColor(block.owner),
-                    }}
+                  <span
+                    className="w-7 h-7 rounded flex items-center justify-center text-[10px] font-mono font-bold"
+                    style={{ background: ownerColor(b.owner) + "18", color: ownerColor(b.owner) }}
                   >
-                    {block.id}
+                    {b.id}
+                  </span>
+                  <div className="flex-1 min-w-0">
+                    <span className="text-xs font-medium" style={{ color: ownerColor(b.owner) }}>
+                      {b.owner === "shared_AB" ? "Shared (A+B)" : b.owner}
+                    </span>
+                    <span className="text-[10px] ml-2" style={{ color: "var(--text-muted)" }}>
+                      {b.type} cache · {b.tokens} tok
+                    </span>
                   </div>
-                  <div className="flex-1">
-                    <div className="text-xs font-medium">
-                      {block.owner === "shared_AB" ? (
-                        <span className="text-amber-400">Shared (A+B)</span>
-                      ) : (
-                        <span style={{ color: getOwnerColor(block.owner) }}>{block.owner}</span>
-                      )}
-                      <span className="text-[var(--muted)]"> · Layer {block.layer}</span>
-                    </div>
-                    <div className="text-[10px] text-[var(--muted)]">
-                      {block.type.toUpperCase()} cache · {block.tokens} tokens
-                    </div>
-                  </div>
-                  {block.refCount > 1 && (
-                    <div className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-400">
-                      refs: {block.refCount}
-                    </div>
+                  {b.refCount > 1 && (
+                    <span
+                      className="text-[9px] px-1.5 py-0.5 rounded-full font-medium"
+                      style={{ background: "#f59e0b15", color: "#f59e0b" }}
+                    >
+                      refs: {b.refCount}
+                    </span>
                   )}
                 </motion.div>
               ))}
           </div>
         </div>
 
-        {/* Physical Memory Visualization */}
-        <div className="bg-[var(--card-bg)] border border-[var(--card-border)] rounded-xl p-6">
-          <h3 className="text-sm font-semibold text-green-400 mb-4">GPU Memory Layout</h3>
+        {/* GPU memory grid */}
+        <div className="card p-5">
+          <h3 className="section-label mb-4" style={{ color: "#10b981" }}>
+            GPU Memory
+          </h3>
           <div className="grid grid-cols-4 gap-2">
-            {Array.from({ length: totalBlocks }, (_, i) => {
-              const block = cacheBlocks.find((b) => b.id === i);
+            {Array.from({ length: totalSlots }, (_, i) => {
+              const blk = blocks.find((b) => b.id === i);
               return (
                 <motion.div
                   key={i}
                   layout
-                  className={`h-16 rounded-lg border flex flex-col items-center justify-center text-xs ${
-                    block
-                      ? "border-opacity-50"
-                      : "border-[var(--card-border)] bg-[#0a0a0a]"
-                  }`}
-                  style={
-                    block
-                      ? {
-                          backgroundColor: getOwnerColor(block.owner) + "10",
-                          borderColor: getOwnerColor(block.owner) + "40",
-                        }
-                      : {}
-                  }
+                  className="h-14 rounded-lg flex flex-col items-center justify-center text-[10px]"
+                  style={{
+                    background: blk ? ownerColor(blk.owner) + "0c" : "var(--bg-secondary)",
+                    border: `1px solid ${blk ? ownerColor(blk.owner) + "30" : "var(--border)"}`,
+                  }}
                 >
-                  {block ? (
+                  {blk ? (
                     <>
-                      <span
-                        className="font-mono font-bold text-[10px]"
-                        style={{ color: getOwnerColor(block.owner) }}
-                      >
-                        {block.type.toUpperCase()[0]}
+                      <span className="font-mono font-bold" style={{ color: ownerColor(blk.owner) }}>
+                        {blk.type}
                       </span>
-                      <span className="text-[9px] text-[var(--muted)]">
-                        {block.owner === "shared_AB" ? "A+B" : block.owner?.split("_")[1]}
+                      <span style={{ color: "var(--text-muted)" }}>
+                        {blk.owner === "shared_AB" ? "A+B" : blk.owner.split("_")[1]}
                       </span>
                     </>
                   ) : (
-                    <span className="text-[var(--muted)]">free</span>
+                    <span style={{ color: "var(--text-muted)" }}>free</span>
                   )}
                 </motion.div>
               );
             })}
           </div>
-
           {/* Legend */}
           <div className="flex flex-wrap gap-3 mt-4">
-            {sequences.map((seq) => (
-              <div key={seq.id} className="flex items-center gap-1.5">
-                <div
-                  className="w-2.5 h-2.5 rounded"
-                  style={{ backgroundColor: seq.color }}
-                />
-                <span className="text-[10px] text-[var(--muted)]">{seq.id}</span>
+            {sequences.map((s) => (
+              <div key={s.id} className="flex items-center gap-1.5">
+                <div className="w-2 h-2 rounded-full" style={{ background: s.color }} />
+                <span className="text-[10px]" style={{ color: "var(--text-muted)" }}>{s.id}</span>
               </div>
             ))}
-            {showSharing && (
+            {sharing && (
               <div className="flex items-center gap-1.5">
-                <div className="w-2.5 h-2.5 rounded bg-amber-500" />
-                <span className="text-[10px] text-[var(--muted)]">Shared</span>
+                <div className="w-2 h-2 rounded-full bg-amber-500" />
+                <span className="text-[10px]" style={{ color: "var(--text-muted)" }}>Shared</span>
               </div>
             )}
           </div>
@@ -263,40 +223,28 @@ export default function KVCachePage() {
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-4 gap-4 mt-8">
-        {[
-          { label: "Used Blocks", value: usedBlocks, color: "#3b82f6" },
-          { label: "Free Blocks", value: totalBlocks - usedBlocks, color: "#10b981" },
-          { label: "Blocks Saved (Sharing)", value: savedBlocks, color: "#f59e0b" },
-          {
-            label: "Memory Efficiency",
-            value: ((usedBlocks / totalBlocks) * 100).toFixed(0) + "%",
-            color: "#7c3aed",
-          },
-        ].map((stat) => (
-          <div
-            key={stat.label}
-            className="bg-[var(--card-bg)] border border-[var(--card-border)] rounded-lg p-4 text-center"
-          >
-            <div className="text-2xl font-bold" style={{ color: stat.color }}>
-              {stat.value}
-            </div>
-            <div className="text-xs text-[var(--muted)]">{stat.label}</div>
-          </div>
-        ))}
+      <div className="mb-8">
+        <StatGrid
+          stats={[
+            { label: "Used Blocks", value: used, color: "#3b82f6" },
+            { label: "Free Blocks", value: totalSlots - used, color: "#10b981" },
+            { label: "Saved (Sharing)", value: saved, color: "#f59e0b" },
+            { label: "Utilization", value: ((used / totalSlots) * 100).toFixed(0) + "%", color: "var(--accent)" },
+          ]}
+        />
       </div>
 
-      {/* Copy-on-Write Explanation */}
-      <div className="mt-8 bg-[var(--card-bg)] border border-[var(--card-border)] rounded-xl p-6">
-        <h3 className="text-sm font-semibold text-violet-400 mb-3">Copy-on-Write (CoW)</h3>
-        <p className="text-sm text-[var(--muted)] leading-relaxed">
-          When multiple sequences share a KV cache block (e.g., same prompt prefix), vLLM uses
-          <strong className="text-white"> reference counting</strong>. The shared block has refCount {">"}1.
-          When one sequence needs to modify the block (diverging generation), vLLM copies the block
-          first (Copy-on-Write), decrements the ref count on the original, and gives the new copy
-          to the diverging sequence. This is the same technique used by OS memory management.
+      {/* Explanation */}
+      <InfoCard title="Copy-on-Write (CoW)">
+        <p>
+          When sequences share a KV cache block (same prompt prefix), vLLM tracks it with a
+          reference count. As long as nobody modifies the block, all sequences just point at
+          the same physical memory. The moment one sequence diverges (for example, it generates a
+          different next token), vLLM copies the block first, decrements the original&apos;s ref
+          count, and gives the copy to the diverging sequence. Same trick your OS uses for
+          fork().
         </p>
-      </div>
+      </InfoCard>
     </div>
   );
 }

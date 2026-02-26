@@ -2,355 +2,316 @@
 
 import { motion, AnimatePresence } from "framer-motion";
 import { useState, useEffect, useCallback } from "react";
-import { SectionHeader } from "@/components/ui";
+import { SectionHeader, PlaybackControls, InfoCard } from "@/components/ui";
+import { useSpeed } from "@/components/SpeedProvider";
 
-interface Request {
+interface Req {
   id: string;
   prompt: string;
-  totalTokens: number;
-  generatedTokens: number;
+  total: number;
+  done: number;
   status: "waiting" | "running" | "completed";
   color: string;
-  arrivedAt: number; // step when it arrived
+  arrivedAt: number;
 }
+
+const INITIAL: Req[] = [
+  { id: "R1", prompt: "Explain quantum computing", total: 6, done: 0, status: "waiting", color: "#7c3aed", arrivedAt: 0 },
+  { id: "R2", prompt: "Write a haiku about AI", total: 4, done: 0, status: "waiting", color: "#3b82f6", arrivedAt: 0 },
+  { id: "R3", prompt: "Translate to French", total: 8, done: 0, status: "waiting", color: "#10b981", arrivedAt: 0 },
+  { id: "R4", prompt: "Summarize this paper", total: 5, done: 0, status: "waiting", color: "#f59e0b", arrivedAt: 3 },
+  { id: "R5", prompt: "Code a binary search", total: 7, done: 0, status: "waiting", color: "#ef4444", arrivedAt: 5 },
+];
+
+const MAX_BATCH = 3;
 
 export default function ContinuousBatchingPage() {
   const [mode, setMode] = useState<"static" | "continuous">("continuous");
   const [step, setStep] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
 
-  const initialRequests: Request[] = [
-    { id: "R1", prompt: "Explain quantum computing", totalTokens: 6, generatedTokens: 0, status: "waiting", color: "#7c3aed", arrivedAt: 0 },
-    { id: "R2", prompt: "Write a haiku about AI", totalTokens: 4, generatedTokens: 0, status: "waiting", color: "#3b82f6", arrivedAt: 0 },
-    { id: "R3", prompt: "Translate to French", totalTokens: 8, generatedTokens: 0, status: "waiting", color: "#10b981", arrivedAt: 0 },
-    { id: "R4", prompt: "Summarize this paper", totalTokens: 5, generatedTokens: 0, status: "waiting", color: "#f59e0b", arrivedAt: 3 },
-    { id: "R5", prompt: "Code a binary search", totalTokens: 7, generatedTokens: 0, status: "waiting", color: "#ef4444", arrivedAt: 5 },
-  ];
+  const simRequests = useCallback(
+    (cur: number) => {
+      const reqs = INITIAL.map((r) => ({ ...r }));
 
-  const getRequestsAtStep = useCallback((currentStep: number) => {
-    const requests = initialRequests.map((r) => ({ ...r }));
-    const maxBatchSize = 3;
-
-    if (mode === "static") {
-      // Static batching: batch of first 3 requests runs until ALL complete
-      const batch = requests.filter((r) => r.arrivedAt === 0).slice(0, maxBatchSize);
-      const maxTokensInBatch = Math.max(...batch.map((r) => r.totalTokens));
-
-      batch.forEach((r) => {
-        r.status = "running";
-        r.generatedTokens = Math.min(currentStep, r.totalTokens);
-        if (r.generatedTokens >= r.totalTokens) {
-          // In static batching, slot stays occupied until entire batch completes
-          if (currentStep >= maxTokensInBatch) {
-            r.status = "completed";
-          }
-        }
-      });
-
-      // After first batch completes, start next batch
-      if (currentStep >= maxTokensInBatch) {
-        const remaining = requests.filter(
-          (r) => r.status === "waiting" && r.arrivedAt <= currentStep
-        );
-        remaining.slice(0, maxBatchSize).forEach((r) => {
+      if (mode === "static") {
+        const batch = reqs.filter((r) => r.arrivedAt === 0).slice(0, MAX_BATCH);
+        const maxTok = Math.max(...batch.map((r) => r.total));
+        batch.forEach((r) => {
           r.status = "running";
-          r.generatedTokens = Math.min(currentStep - maxTokensInBatch, r.totalTokens);
-          if (r.generatedTokens >= r.totalTokens) r.status = "completed";
+          r.done = Math.min(cur, r.total);
+          if (cur >= maxTok) r.status = "completed";
         });
-      }
-    } else {
-      // Continuous batching: immediately fill slots as sequences complete
-      let runningCount = 0;
-
-      for (let s = 0; s <= currentStep; s++) {
-        // Mark completed
-        requests.forEach((r) => {
-          if (r.status === "running" && r.generatedTokens >= r.totalTokens) {
-            r.status = "completed";
-            runningCount--;
-          }
-        });
-
-        // Add new requests to fill batch
-        requests
-          .filter((r) => r.status === "waiting" && r.arrivedAt <= s)
-          .forEach((r) => {
-            if (runningCount < maxBatchSize) {
+        if (cur >= maxTok) {
+          reqs.filter((r) => r.status === "waiting" && r.arrivedAt <= cur)
+            .slice(0, MAX_BATCH)
+            .forEach((r) => {
               r.status = "running";
-              runningCount++;
+              r.done = Math.min(cur - maxTok, r.total);
+              if (r.done >= r.total) r.status = "completed";
+            });
+        }
+      } else {
+        let running = 0;
+        for (let s = 0; s <= cur; s++) {
+          reqs.forEach((r) => {
+            if (r.status === "running" && r.done >= r.total) {
+              r.status = "completed";
+              running--;
             }
           });
-
-        // Generate one token for running requests
-        requests.forEach((r) => {
-          if (r.status === "running" && s <= currentStep) {
-            r.generatedTokens = Math.min(r.generatedTokens + 1, r.totalTokens);
-          }
+          reqs
+            .filter((r) => r.status === "waiting" && r.arrivedAt <= s)
+            .forEach((r) => {
+              if (running < MAX_BATCH) { r.status = "running"; running++; }
+            });
+          reqs.forEach((r) => {
+            if (r.status === "running") r.done = Math.min(r.done + 1, r.total);
+          });
+        }
+        reqs.forEach((r) => {
+          if (r.status === "running" && r.done >= r.total) r.status = "completed";
         });
       }
+      return reqs;
+    },
+    [mode],
+  );
 
-      // Final check
-      requests.forEach((r) => {
-        if (r.status === "running" && r.generatedTokens >= r.totalTokens) {
-          r.status = "completed";
-        }
-      });
-    }
+  const requests = simRequests(step);
 
-    return requests;
-  }, [mode]);
-
-  const requests = getRequestsAtStep(step);
+  const { interval } = useSpeed();
 
   useEffect(() => {
     if (!isPlaying) return;
-    const timer = setInterval(() => {
+    const t = setInterval(() => {
       setStep((s) => {
-        if (s >= 20) {
-          setIsPlaying(false);
-          return s;
-        }
+        if (s >= 20) { setIsPlaying(false); return s; }
         return s + 1;
       });
-    }, 600);
-    return () => clearInterval(timer);
-  }, [isPlaying]);
+    }, interval(550));
+    return () => clearInterval(t);
+  }, [isPlaying, interval]);
 
   const running = requests.filter((r) => r.status === "running");
   const waiting = requests.filter((r) => r.status === "waiting");
   const completed = requests.filter((r) => r.status === "completed");
-  const gpuUtil = (running.length / 3) * 100;
+  const gpuPct = ((running.length / MAX_BATCH) * 100).toFixed(0);
 
   return (
-    <div className="max-w-6xl mx-auto">
+    <div>
       <SectionHeader
+        badge="Scheduling"
         title="Continuous Batching"
-        subtitle="Instead of waiting for the entire batch to finish, vLLM immediately fills empty slots with new requests — dramatically improving GPU utilization and throughput."
-        badge="SCHEDULING"
+        subtitle="Static batching wastes GPU cycles whenever a short request finishes early. Continuous batching fills those empty slots immediately, keeping the GPU busy."
       />
 
-      {/* Mode Selector */}
-      <div className="flex items-center gap-4 mb-8">
-        <div className="flex rounded-lg overflow-hidden border border-[var(--card-border)]">
+      {/* Mode toggle */}
+      <div className="flex items-center gap-3 mb-2">
+        <div
+          className="inline-flex rounded-lg overflow-hidden"
+          style={{ border: "1px solid var(--border)" }}
+        >
           {(["static", "continuous"] as const).map((m) => (
             <button
               key={m}
-              onClick={() => {
-                setMode(m);
-                setStep(0);
-                setIsPlaying(false);
+              onClick={() => { setMode(m); setStep(0); setIsPlaying(false); }}
+              className="px-4 py-2 text-xs font-medium transition-colors"
+              style={{
+                background: mode === m ? "var(--accent-subtle)" : "var(--bg-card)",
+                color: mode === m ? "var(--accent-text)" : "var(--text-muted)",
               }}
-              className={`px-4 py-2 text-sm font-medium transition-colors ${
-                mode === m
-                  ? "bg-violet-500/20 text-violet-400"
-                  : "bg-[var(--card-bg)] text-[var(--muted)] hover:text-white"
-              }`}
             >
-              {m === "static" ? "Static Batching" : "Continuous Batching"}
+              {m === "static" ? "Static" : "Continuous"}
             </button>
           ))}
         </div>
-
-        <button
-          onClick={() => {
-            setStep(0);
-            setIsPlaying(true);
-          }}
-          className="px-4 py-2 rounded-lg bg-violet-500/20 text-violet-400 border border-violet-500/40 text-sm font-medium"
-        >
-          ▶ Play
-        </button>
-        <button
-          onClick={() => setIsPlaying(false)}
-          className="px-4 py-2 rounded-lg bg-[var(--card-bg)] border border-[var(--card-border)] text-sm text-[var(--muted)]"
-        >
-          ⏸
-        </button>
-        <button
-          onClick={() => { setStep(0); setIsPlaying(false); }}
-          className="px-4 py-2 rounded-lg bg-[var(--card-bg)] border border-[var(--card-border)] text-sm text-[var(--muted)]"
-        >
-          ↺
-        </button>
-
-        <div className="ml-auto text-sm text-[var(--muted)] font-mono">
-          Iteration: {step}
-        </div>
       </div>
 
-      {/* GPU Slots Visualization */}
-      <div className="bg-[var(--card-bg)] border border-[var(--card-border)] rounded-xl p-6 mb-8">
+      <PlaybackControls
+        isPlaying={isPlaying}
+        onPlay={() => { setStep(0); setIsPlaying(true); }}
+        onPause={() => setIsPlaying(false)}
+        onReset={() => { setStep(0); setIsPlaying(false); }}
+        step={step}
+        maxStep={20}
+        label="Iter"
+      />
+
+      {/* GPU batch slots */}
+      <div className="card p-5 mb-6">
         <div className="flex items-center justify-between mb-4">
-          <h3 className="text-sm font-semibold text-green-400">GPU Batch Slots (max: 3)</h3>
-          <span className={`text-sm font-medium ${gpuUtil >= 100 ? "text-green-400" : gpuUtil > 0 ? "text-amber-400" : "text-red-400"}`}>
-            GPU Utilization: {gpuUtil.toFixed(0)}%
+          <h3 className="section-label" style={{ color: "#10b981" }}>
+            GPU Batch Slots (max {MAX_BATCH})
+          </h3>
+          <span
+            className="text-xs font-mono font-medium"
+            style={{
+              color: Number(gpuPct) >= 100 ? "#10b981" : Number(gpuPct) > 0 ? "#f59e0b" : "#ef4444",
+            }}
+          >
+            {gpuPct}% utilized
           </span>
         </div>
 
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-3 gap-3">
           {[0, 1, 2].map((slot) => {
             const req = running[slot];
             return (
-              <motion.div
+              <div
                 key={slot}
-                layout
-                className={`h-32 rounded-xl border-2 border-dashed flex flex-col items-center justify-center transition-colors ${
-                  req ? "border-solid" : "border-[var(--card-border)]"
-                }`}
-                style={
-                  req
-                    ? {
-                        borderColor: req.color,
-                        backgroundColor: req.color + "10",
-                      }
-                    : {}
-                }
+                className="h-28 rounded-xl flex flex-col items-center justify-center transition-colors"
+                style={{
+                  border: `2px ${req ? "solid" : "dashed"} ${req ? req.color + "50" : "var(--border)"}`,
+                  background: req ? req.color + "08" : "transparent",
+                }}
               >
                 <AnimatePresence mode="wait">
                   {req ? (
                     <motion.div
                       key={req.id}
-                      initial={{ opacity: 0, scale: 0.8 }}
+                      initial={{ opacity: 0, scale: 0.85 }}
                       animate={{ opacity: 1, scale: 1 }}
-                      exit={{ opacity: 0, scale: 0.8 }}
-                      className="text-center"
+                      exit={{ opacity: 0, scale: 0.85 }}
+                      className="text-center px-2"
                     >
-                      <div className="font-mono font-bold text-lg" style={{ color: req.color }}>
+                      <div className="font-mono font-bold text-base" style={{ color: req.color }}>
                         {req.id}
                       </div>
-                      <div className="text-xs text-[var(--muted)] mt-1 max-w-[120px] truncate">
+                      <div
+                        className="text-[10px] mt-0.5 max-w-[110px] truncate"
+                        style={{ color: "var(--text-muted)" }}
+                      >
                         {req.prompt}
                       </div>
-                      {/* Progress bar */}
-                      <div className="w-24 h-2 bg-[var(--card-border)] rounded-full mt-2 mx-auto overflow-hidden">
+                      {/* progress */}
+                      <div
+                        className="w-20 h-1.5 rounded-full mt-2 mx-auto overflow-hidden"
+                        style={{ background: "var(--bg-secondary)" }}
+                      >
                         <motion.div
                           className="h-full rounded-full"
-                          style={{ backgroundColor: req.color }}
-                          animate={{ width: `${(req.generatedTokens / req.totalTokens) * 100}%` }}
+                          style={{ background: req.color }}
+                          animate={{ width: `${(req.done / req.total) * 100}%` }}
                         />
                       </div>
-                      <div className="text-[10px] text-[var(--muted)] mt-1">
-                        {req.generatedTokens}/{req.totalTokens} tokens
+                      <div className="text-[9px] mt-1 font-mono" style={{ color: "var(--text-muted)" }}>
+                        {req.done}/{req.total}
                       </div>
                     </motion.div>
                   ) : (
-                    <motion.div
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      className="text-[var(--muted)] text-sm"
-                    >
-                      Empty Slot
-                    </motion.div>
+                    <span className="text-xs" style={{ color: "var(--text-muted)" }}>
+                      Empty
+                    </span>
                   )}
                 </AnimatePresence>
-              </motion.div>
+              </div>
             );
           })}
         </div>
       </div>
 
-      {/* Queue and Completed */}
-      <div className="grid grid-cols-2 gap-8">
-        {/* Waiting Queue */}
-        <div className="bg-[var(--card-bg)] border border-[var(--card-border)] rounded-xl p-6">
-          <h3 className="text-sm font-semibold text-amber-400 mb-4">
-            Waiting Queue ({waiting.length})
+      {/* Waiting + Completed */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
+        <div className="card p-5">
+          <h3 className="section-label mb-3" style={{ color: "#f59e0b" }}>
+            Waiting ({waiting.length})
           </h3>
-          <div className="space-y-2">
+          <div className="space-y-1.5 min-h-[80px]">
             <AnimatePresence>
-              {waiting.map((req) => (
+              {waiting.map((r) => (
                 <motion.div
-                  key={req.id}
+                  key={r.id}
                   layout
-                  initial={{ opacity: 0, x: -20 }}
+                  initial={{ opacity: 0, x: -12 }}
                   animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: 20 }}
-                  className="flex items-center gap-3 rounded-lg p-3 bg-[#0a0a0a]"
+                  exit={{ opacity: 0, x: 12 }}
+                  className="flex items-center gap-2.5 rounded-lg p-2"
+                  style={{ background: "var(--bg-secondary)" }}
                 >
-                  <div
-                    className="w-8 h-8 rounded flex items-center justify-center font-mono font-bold text-sm"
-                    style={{ backgroundColor: req.color + "20", color: req.color }}
+                  <span
+                    className="w-6 h-6 rounded flex items-center justify-center text-[10px] font-mono font-bold"
+                    style={{ background: r.color + "18", color: r.color }}
                   >
-                    {req.id}
-                  </div>
-                  <div className="flex-1">
-                    <div className="text-xs font-medium">{req.prompt}</div>
-                    <div className="text-[10px] text-[var(--muted)]">
-                      {req.totalTokens} tokens to generate
+                    {r.id}
+                  </span>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-[11px] font-medium truncate" style={{ color: "var(--text)" }}>
+                      {r.prompt}
+                    </div>
+                    <div className="text-[9px]" style={{ color: "var(--text-muted)" }}>
+                      {r.total} tokens
                     </div>
                   </div>
                 </motion.div>
               ))}
             </AnimatePresence>
             {waiting.length === 0 && (
-              <div className="text-sm text-[var(--muted)] text-center py-4">Queue empty</div>
+              <p className="text-[11px] text-center py-3" style={{ color: "var(--text-muted)" }}>
+                Queue empty
+              </p>
             )}
           </div>
         </div>
 
-        {/* Completed */}
-        <div className="bg-[var(--card-bg)] border border-[var(--card-border)] rounded-xl p-6">
-          <h3 className="text-sm font-semibold text-green-400 mb-4">
+        <div className="card p-5">
+          <h3 className="section-label mb-3" style={{ color: "#10b981" }}>
             Completed ({completed.length})
           </h3>
-          <div className="space-y-2">
+          <div className="space-y-1.5 min-h-[80px]">
             <AnimatePresence>
-              {completed.map((req) => (
+              {completed.map((r) => (
                 <motion.div
-                  key={req.id}
+                  key={r.id}
                   layout
-                  initial={{ opacity: 0, x: -20 }}
+                  initial={{ opacity: 0, x: -12 }}
                   animate={{ opacity: 1, x: 0 }}
-                  className="flex items-center gap-3 rounded-lg p-3 bg-green-500/5"
+                  className="flex items-center gap-2.5 rounded-lg p-2"
+                  style={{ background: "#10b98108" }}
                 >
-                  <div
-                    className="w-8 h-8 rounded flex items-center justify-center font-mono font-bold text-sm"
-                    style={{ backgroundColor: req.color + "20", color: req.color }}
+                  <span
+                    className="w-6 h-6 rounded flex items-center justify-center text-[10px] font-bold"
+                    style={{ color: "#10b981" }}
                   >
                     ✓
-                  </div>
-                  <div className="flex-1">
-                    <div className="text-xs font-medium">{req.id} — {req.prompt}</div>
-                    <div className="text-[10px] text-green-400">
-                      {req.totalTokens} tokens generated
+                  </span>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-[11px] font-medium truncate" style={{ color: "var(--text)" }}>
+                      {r.id} — {r.prompt}
+                    </div>
+                    <div className="text-[9px]" style={{ color: "#10b981" }}>
+                      {r.total} tokens done
                     </div>
                   </div>
                 </motion.div>
               ))}
             </AnimatePresence>
             {completed.length === 0 && (
-              <div className="text-sm text-[var(--muted)] text-center py-4">None yet</div>
+              <p className="text-[11px] text-center py-3" style={{ color: "var(--text-muted)" }}>
+                None yet
+              </p>
             )}
           </div>
         </div>
       </div>
 
       {/* Explanation */}
-      <div className="mt-8 bg-[var(--card-bg)] border border-[var(--card-border)] rounded-xl p-6">
-        <h3 className="text-sm font-semibold text-violet-400 mb-3">
-          {mode === "static" ? "Static Batching (Baseline)" : "Continuous Batching (vLLM)"}
-        </h3>
-        <p className="text-sm text-[var(--muted)] leading-relaxed">
-          {mode === "static" ? (
-            <>
-              <strong className="text-white">Static batching</strong> groups requests into a fixed batch.
-              Even if one request finishes early, its GPU slot stays occupied until the entire batch is done.
-              New requests must wait until all sequences in the current batch complete. This leads to
-              <strong className="text-red-400"> significant GPU underutilization</strong>, especially when
-              sequence lengths vary.
-            </>
-          ) : (
-            <>
-              <strong className="text-white">Continuous batching</strong> (iteration-level scheduling)
-              checks for completed sequences after every iteration. Finished sequences are immediately
-              removed and new requests can fill the empty slots. This means the GPU is
-              <strong className="text-green-400"> almost always fully utilized</strong>.
-              vLLM implements this at the token level — each iteration generates exactly one token per
-              running sequence.
-            </>
-          )}
-        </p>
-      </div>
+      <InfoCard title={mode === "static" ? "Static batching (the old way)" : "Continuous batching (vLLM)"}>
+        {mode === "static" ? (
+          <p>
+            A fixed batch of requests is loaded onto the GPU. Even when one finishes early,
+            its slot sits idle until the longest request in the batch is done. New arrivals have
+            to wait. The result: lots of wasted compute, especially when sequence lengths vary.
+          </p>
+        ) : (
+          <p>
+            After every single iteration (one token per sequence), vLLM checks who&apos;s done.
+            Finished sequences free their slot immediately, and waiting requests slide in.
+            The GPU stays full almost all the time. This is why vLLM can serve 2-4x more
+            requests per second than static-batching systems.
+          </p>
+        )}
+      </InfoCard>
     </div>
   );
 }

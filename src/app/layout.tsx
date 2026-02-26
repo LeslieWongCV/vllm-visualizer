@@ -2,6 +2,9 @@ import type { Metadata } from "next";
 import { Inter, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 import Sidebar from "@/components/Sidebar";
+import Footer from "@/components/Footer";
+import { ThemeProvider } from "@/components/ThemeProvider";
+import { SpeedProvider } from "@/components/SpeedProvider";
 
 const inter = Inter({
   variable: "--font-inter",
@@ -16,7 +19,7 @@ const jetbrainsMono = JetBrains_Mono({
 export const metadata: Metadata = {
   title: "vLLM Architecture Visualizer",
   description:
-    "Interactive visualizer for vLLM — the high-throughput LLM serving engine",
+    "Interactive visualizer for vLLM, the high-throughput LLM serving engine",
 };
 
 export default function RootLayout({
@@ -25,14 +28,23 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className="dark">
+    <html lang="en" suppressHydrationWarning>
       <body
-        className={`${inter.variable} ${jetbrainsMono.variable} antialiased flex min-h-screen`}
+        className={`${inter.variable} ${jetbrainsMono.variable} antialiased`}
       >
-        <Sidebar />
-        <main className="flex-1 ml-64 p-8 overflow-y-auto">
-          {children}
-        </main>
+        <ThemeProvider>
+          <SpeedProvider>
+          <div className="flex min-h-screen">
+            <Sidebar />
+            <div className="flex-1 ml-[240px] flex flex-col min-h-screen">
+              <main className="flex-1 px-10 py-8 max-w-5xl w-full mx-auto">
+                {children}
+              </main>
+              <Footer />
+            </div>
+          </div>
+          </SpeedProvider>
+        </ThemeProvider>
       </body>
     </html>
   );
