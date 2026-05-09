@@ -1,21 +1,48 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# vLLM Visualizer
 
-## Getting Started
+An interactive, step-by-step visual guide to the internals of [vLLM](https://github.com/vllm-project/vllm) — the high-throughput LLM serving engine.
 
-First, run the development server:
+![vLLM Visualizer demo](demo.png)
+
+**Live demo:** [vllm-visualizer.vercel.app](https://vllm-visualizer.vercel.app)
+
+---
+
+## What's inside
+
+| Page | What it covers |
+|---|---|
+| **Transformer Architecture** | Attention heads, FFN, residual connections, RMSNorm |
+| **PagedAttention** | OS-inspired virtual memory for KV cache blocks |
+| **KV Cache Management** | Non-contiguous storage, block tables, copy-on-write, prefix sharing |
+| **PD Disaggregation** | Prefill vs decode bottlenecks, separate GPU pools, KV transfer via RDMA |
+| **Continuous Batching** | Iteration-level scheduling vs static batching |
+| **Scheduler & Preemption** | FCFS queues, swap vs recompute strategies |
+| **BPE Tokenizer** | Byte-pair encoding visualized token by token |
+| **Llama 3.1 8B Deep Dive** | GQA, RoPE, memory footprint, vLLM serving numbers |
+
+All visualizations are interactive — use Play / Pause / Speed controls or click phase buttons to jump to any step.
+
+---
+
+## Running locally
 
 ```bash
+git clone https://github.com/LeslieWongCV/vllm-visualizer.git
+cd vllm-visualizer
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000).
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Stack
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+- [Next.js 14](https://nextjs.org) (App Router)
+- [Framer Motion](https://www.framer.com/motion/) — animations
+- [Tailwind CSS](https://tailwindcss.com) — layout and spacing
+- CSS custom properties — GitHub Primer light/dark theme
+
+## License
+
+Apache-2.0
