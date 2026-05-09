@@ -35,6 +35,16 @@ const features = [
     ),
   },
   {
+    href: "/pd-disaggregation",
+    title: "PD Disaggregation",
+    description:
+      "Prefill is compute-bound; decode is bandwidth-bound. Routing them to separate GPU pools cuts TTFT by up to 2× without recomputation.",
+    color: "#8250df",
+    icon: (
+      <svg width="22" height="22" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24"><rect x="2" y="3" width="8" height="18" rx="1.5"/><rect x="14" y="3" width="8" height="18" rx="1.5"/><path d="M10 8l4 4-4 4" strokeLinecap="round" strokeLinejoin="round"/></svg>
+    ),
+  },
+  {
     href: "/continuous-batching",
     title: "Continuous Batching",
     description:
@@ -66,9 +76,9 @@ const features = [
   },
   {
     href: "/llama",
-    title: "Llama 3.1 8B Deep Dive",
+    title: "Qwen3-8B Deep Dive",
     description:
-      "Concrete architecture numbers for Meta's Llama 3.1-8B: GQA heads, RoPE scaling, memory footprint, and how vLLM serves it.",
+      "Concrete architecture numbers for Qwen3-8B: GQA heads, RoPE, memory footprint, and how vLLM serves a modern dense model end-to-end.",
     color: "#0969da",
     icon: (
       <svg width="22" height="22" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24"><path d="M12 2v5M7 4l3 4M17 4l-3 4"/><circle cx="12" cy="14" r="5.5"/><path d="M9.5 13h5M10 16h4"/></svg>
@@ -123,7 +133,7 @@ export default function Home() {
             style={{ background: "var(--bg-secondary)", border: "1px solid var(--border)", color: "var(--text-secondary)" }}
           >
             <svg width="11" height="11" viewBox="0 0 16 16" fill="currentColor"><path d="M1 7.775V2.75C1 1.784 1.784 1 2.75 1h5.025c.464 0 .91.184 1.238.513l6.25 6.25a1.75 1.75 0 010 2.474l-5.026 5.026a1.75 1.75 0 01-2.474 0l-6.25-6.25A1.75 1.75 0 011 7.775zm1.5 0c0 .066.026.13.073.177l6.25 6.25a.25.25 0 00.354 0l5.025-5.025a.25.25 0 000-.354l-6.25-6.25a.25.25 0 00-.177-.073H2.75a.25.25 0 00-.25.25v5.025zM6 5a1 1 0 100 2 1 1 0 000-2z"/></svg>
-            v0.17.1
+            v0.20.1
           </span>
           {/* License */}
           <span
