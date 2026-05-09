@@ -35,7 +35,7 @@ The model compares every Query against every Key to figure out which tokens are 
     color: "#8250df",
     detail: `Instead of doing attention once, the model does it many times in parallel. These parallel runs are called "heads." Each head can focus on something different. One head might track grammar (subject-verb agreement), another might track meaning (what the sentence is about), and another might focus on nearby words vs. distant ones.
 
-Qwen3-8B uses 32 heads. It's like having 32 people read the same sentence, each highlighting different relationships, and then combining all their notes into one summary.`,
+Gemma 4 31B uses 32 heads. It's like having 32 people read the same sentence, each highlighting different relationships, and then combining all their notes into one summary.`,
     analogy: "Like a group project: each person reads the same document but takes notes on different things, then you combine everyone's notes for a complete picture.",
   },
   {
@@ -81,10 +81,9 @@ It doesn't always pick the most likely word; that would make it repetitive and b
 ];
 
 const modelConfigs = [
-  { name: "Gemma 3 4B",   layers: 34, heads: 8,   kvHeads: 4,      dim: 2560, ffn: 10240, vocab: "262K", ctx: "128K" },
-  { name: "Gemma 3 27B",  layers: 46, heads: 32,  kvHeads: 16,     dim: 5120, ffn: 20480, vocab: "262K", ctx: "128K" },
-  { name: "DeepSeek-V3",  layers: 61, heads: 128, kvHeads: "MLA",  dim: 7168, ffn: 18432, vocab: "129K", ctx: "128K" },
-  { name: "Qwen3-8B",     layers: 36, heads: 32,  kvHeads: 8,      dim: 4096, ffn: 22016, vocab: "152K", ctx: "128K" },
+  { name: "Gemma 4 31B",      layers: 60, heads: 32,  kvHeads: 16, dim: 5376, ffn: 21504, vocab: "262K", ctx: "256K" },
+  { name: "DeepSeek-V4-Pro",  layers: 61, heads: 128, kvHeads: 1,  dim: 7168, ffn: 3072,  vocab: "129K", ctx: "1M"   },
+  { name: "Qwen3.6-27B",      layers: 64, heads: 24,  kvHeads: 4,  dim: 5120, ffn: 17408, vocab: "248K", ctx: "256K" },
 ];
 
 export default function ArchitecturePage() {
@@ -349,8 +348,8 @@ export default function ArchitecturePage() {
           <p>Stacking 32 (or 80, or 126) layers gives the model enough depth to go from raw words to genuinely understanding what you&apos;re asking.</p>
         </InfoCard>
         <InfoCard title="What are attention heads?">
-          <p>A single attention head can only focus on one kind of relationship at a time. With multiple heads (32 in Qwen3-8B), the model can track many things simultaneously: grammar, meaning, word proximity, coreference, and more.</p>
-          <p><strong>Grouped-Query Attention (GQA)</strong> is a memory-saving trick: instead of giving every head its own Key and Value, several heads share the same ones. Qwen3-8B has 32 query heads and 8 KV heads — 4 query heads share each KV pair — cutting memory use by 4× with minimal quality loss. DeepSeek-V3 goes further with MLA (Multi-head Latent Attention), compressing KV into a single low-rank latent vector.</p>
+          <p>A single attention head can only focus on one kind of relationship at a time. With multiple heads (32 in Gemma 4 31B), the model can track many things simultaneously: grammar, meaning, word proximity, coreference, and more.</p>
+          <p><strong>Grouped-Query Attention (GQA)</strong> shares KV heads across multiple query heads to cut memory. Gemma 4 31B uses 32 Q / 16 KV (ratio 2:1). Qwen3.6-27B goes further with 24 Q / 4 KV (6:1). DeepSeek-V4-Pro takes it to the extreme with <strong>MQA</strong> — all 128 query heads share a single KV head, reducing KV cache to 1/128 of full MHA.</p>
         </InfoCard>
         <InfoCard title="Why skip connections matter">
           <p>Without skip connections, information would have to survive passing through dozens of layers of transformations. In practice, it gets distorted and lost, making the model impossible to train.</p>
