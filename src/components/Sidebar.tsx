@@ -72,7 +72,7 @@ export default function Sidebar() {
               vLLM Visualizer
             </span>
             <span className="block text-[11px]" style={{ color: "var(--text-muted)" }}>
-              v0.17.1 &middot; Interactive Docs
+              v0.20.1 &middot; Interactive Docs
             </span>
           </div>
         </Link>
