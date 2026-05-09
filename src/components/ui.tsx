@@ -74,13 +74,20 @@ export function PlaybackControls({
   const { speed, setSpeed } = useSpeed();
   const speeds: (0.5 | 1 | 1.5 | 2)[] = [0.5, 1, 1.5, 2];
 
+  const isPaused = !isPlaying && step > 0 && step < maxStep;
+
   return (
     <div className="flex items-center gap-3 mb-8 flex-wrap">
-      <button onClick={onPlay} className="btn-primary">
+      <button onClick={onPlay} className={isPaused ? "btn-secondary" : "btn-primary"} style={{ minWidth: "90px", justifyContent: "center" }}>
         <svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor"><polygon points="2,0 12,6 2,12"/></svg>
-        Play
+        {isPaused ? "Resume" : "Play"}
       </button>
-      <button onClick={onPause} className="btn-secondary" disabled={!isPlaying}>
+      <button
+        onClick={onPause}
+        disabled={!isPlaying}
+        className={isPaused ? "btn-primary" : "btn-secondary"}
+        style={isPaused ? { opacity: 1 } : undefined}
+      >
         <svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor"><rect x="1" y="0" width="3.5" height="12" rx="0.5"/><rect x="7.5" y="0" width="3.5" height="12" rx="0.5"/></svg>
         Pause
       </button>

@@ -18,6 +18,9 @@ const navItems = [
   { href: "/kv-cache", label: "KV Cache", icon: (
     <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><ellipse cx="8" cy="4" rx="6" ry="2.5"/><path d="M2 4v4c0 1.38 2.69 2.5 6 2.5s6-1.12 6-2.5V4"/><path d="M2 8v4c0 1.38 2.69 2.5 6 2.5s6-1.12 6-2.5V8"/></svg>
   )},
+  { href: "/pd-disaggregation", label: "PD Disaggregation", icon: (
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><rect x="1" y="2" width="6" height="12" rx="1"/><rect x="9" y="2" width="6" height="12" rx="1"/><path d="M7 5l2 3-2 3" strokeDasharray="none"/></svg>
+  )},
   { href: "/continuous-batching", label: "Batching", icon: (
     <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M1 8h14"/><path d="M8 1v14"/><path d="M3.5 3.5l9 9"/><path d="M12.5 3.5l-9 9"/></svg>
   )},
