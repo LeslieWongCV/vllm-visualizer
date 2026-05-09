@@ -4,8 +4,6 @@ An interactive, step-by-step visual guide to the internals of [vLLM](https://git
 
 ![vLLM Visualizer demo](demo.png)
 
-**Live demo:** [vllm-visualizer.vercel.app](https://vllm-visualizer.vercel.app)
-
 ---
 
 ## What's inside
